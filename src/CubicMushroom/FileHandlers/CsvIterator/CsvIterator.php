@@ -11,7 +11,7 @@
  *   http://snipplr.com/view/1986/
  */
 
-namespace CubicMushroom\CsvIterator;
+namespace CubicMushroom\FileHandlers\CsvIterator;
 
 // We need to enable support for Mac format line endings
 ini_set("auto_detect_line_endings", true);
