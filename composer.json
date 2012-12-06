@@ -1,6 +1,6 @@
 {
-    "name": "cubicmushroom/csv-iterator",
-    "description": "Helper to iterate through rows of CSV files",
+    "name": "cubicmushroom/file-handlers",
+    "description": "File handling helpers",
     "stability": "stable",
     "authors": [
         {
