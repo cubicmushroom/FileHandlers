@@ -288,4 +288,70 @@ class CsvIteratorTest extends \PHPUnit_Framework_TestCase
         // Check only 4 rows are returned
         $this->assertEquals(3, $row);
     }
+
+    /**
+     * Test to check hasHeaders changes work as expected
+     */
+    public function testIgnoredHeadersLater()
+    {
+
+        // We need to used the reflection class to access the protected properties of
+        // the iterator object
+        $reflection_class = new \ReflectionClass(__NAMESPACE__ . "\CsvIterator");
+        $hasHeaders_prop = $reflection_class->getProperty('hasHeaders');
+        $hasHeaders_prop->setAccessible(true);
+        $headers_prop = $reflection_class->getProperty('headers');
+        $headers_prop->setAccessible(true);
+
+        $iterator = new CsvIterator(
+            __DIR__ . '/files/test_file.csv',
+            'none'
+        );
+
+        /**
+         * Test ignoring headers
+         */
+        $iterator->setHasHeaders('ignore');
+
+        // Verify the hasHeader property has been updated
+        $this->assertEquals(true, $hasHeaders_prop->getValue($iterator));
+
+        // Verify the headers are stored correctly
+
+        // Verify that the 1st row returned is now actually the 2nd row
+        foreach ($iterator as $key => $value) {
+            $this->assertEquals(2, $key);
+            $this->assertEquals(
+                $value,
+                array("Toby","Griffiths","Test","Test","12/10/1973")
+            );
+            break;
+        }
+
+        /**
+         * Test using headers
+         */
+        $iterator->setHasHeaders('use');
+
+        // Verify the hasHeader property has been updated
+        $this->assertEquals(true, $hasHeaders_prop->getValue($iterator));
+
+        // Verify the headers are stored correctly
+
+        // Verify that the 1st row returned is now actually the 2nd row
+        foreach ($iterator as $key => $value) {
+            $this->assertEquals(2, $key);
+            $this->assertEquals(
+                $value,
+                array(
+                    "First name" => "Toby",
+                    "Surname" => "Griffiths",
+                    "3" => "Test",
+                    "4" => "Test",
+                    "DoB" => "12/10/1973"
+                )
+            );
+            break;
+        }
+    }
 }

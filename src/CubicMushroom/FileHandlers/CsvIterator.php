@@ -75,16 +75,16 @@ class CsvIterator implements \Iterator
      *                          'none' = File has a header row, but returned row will
      *                                   have numbered index
      */
-    public function __construct($file, $header = 'none', $delimiter = ",", $rowSize = 0)
+    public function __construct($file, $headers = 'none', $delimiter = ",", $rowSize = 0)
     {
         if (!is_file($file)){
             throw new \InvalidArgumentException(
                 'File not found (' . $this->file . ')'
             );
         }
-        if (! in_array($header, array('none', 'use', 'ignore'))) {
+        if (! in_array($headers, array('none', 'use', 'ignore'))) {
             throw new \InvalidArgumentException(
-                '$header must be one of none|use|ignore'
+                '$headers must be one of none|use|ignore'
             );
         }
         if (! is_integer($rowSize)) {
@@ -97,15 +97,37 @@ class CsvIterator implements \Iterator
 
         $this->iteratorRow = 0;
 
-        if ('none' != $header) {
-            $this->hasHeaders = true;
-            if ('use' == $header) {
-                $this->useHeaders = true;
-            }
-        }
+        $this->setHeaders($headers);
 
         $this->openFile();
         $this->rowSize = $rowSize;
+    }
+
+    /**
+     * 
+     */
+    protected function setHeaders($value)
+    {
+        $allowed_values = array('none', 'ignore', 'use');
+
+        if (! in_array($value, $allowed_values)) {
+            throw new InvalidArgumentException(
+                '$headers value must be one of "' . implode('", "', $allowed_values) 
+                . '"'
+            );
+        }
+
+        if ('none' == $value) {
+            $this->hasHeaders = false;
+            $this->useHeaders = false;
+        } else {
+            $this->hasHeaders = true;
+            if ('ignore' == $value) {
+                $this->useHeaders = false;
+            } else {
+                $this->useHeaders = true;
+            }
+        }
     }
 
     /**
@@ -219,6 +241,18 @@ class CsvIterator implements \Iterator
             return false;
         }
         return true;
+    }
+
+    public function setHasHeaders($headers)
+    {
+        $this->setHeaders($headers);
+
+        // If headers are now needed, we need to re-open the file so that the headers
+        // property is updated
+        if ($this->hasHeaders) {
+            fclose($this->fileHandle);
+            $this->openFile();
+        }
     }
 
 }
