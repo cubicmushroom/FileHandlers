@@ -237,9 +237,10 @@ class CsvIterator implements \Iterator
      */
     public function current()
     {
+        $line = fgets($this->fileHandle);
 
-        $this->iteratorElement = fgetcsv(
-            $this->fileHandle, $this->rowSize, $this->delimiter
+        $this->iteratorElement = str_getcsv(
+            $line, $this->delimiter
         );
 
         $headers = $this->headers;
