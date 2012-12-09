@@ -163,7 +163,7 @@ class CsvIteratorTest extends \PHPUnit_Framework_TestCase
         $this->assertNull($headers_prop->getValue($iterator));
 
         // Assert: iteratorRow = 0
-        $this->assertEquals(1, $iteratorRow_prop->getValue($iterator));
+        $this->assertEquals(2, $iteratorRow_prop->getValue($iterator));
 
         // Read rows & assert values
         $expected_values = array(
@@ -216,8 +216,6 @@ class CsvIteratorTest extends \PHPUnit_Framework_TestCase
         $hasHeaders_prop->setAccessible(true);
         $headers_prop = $reflection_class->getProperty('headers');
         $headers_prop->setAccessible(true);
-        $iteratorRow_prop = $reflection_class->getProperty('iteratorRow');
-        $iteratorRow_prop->setAccessible(true);
 
         $iterator = new CsvIterator(
             __DIR__ . '/files/test_file.csv',
@@ -236,33 +234,30 @@ class CsvIteratorTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals(',', $delimiter_prop->getValue($iterator));
 
         // Assert: Headers are NULL
-        $expected_headers = array("First name","Surname","3","4","DoB");
+        $expected_headers = array("First name","Surname","","","DoB");
         $this->assertEquals($expected_headers, $headers_prop->getValue($iterator));
-
-        // Assert: iteratorRow = 0
-        $this->assertEquals(1, $iteratorRow_prop->getValue($iterator));
 
         // Read rows & assert values
         $expected_values = array(
             array('key' => '2', 'values' => array(
                 "First name" => "Toby",
                 "Surname" => "Griffiths",
-                "3" => "Test",
-                "4" => "Test",
+                "Column 3" => "Test",
+                "Column 4" => "Test",
                 "DoB" => "12/10/1973",
             )),
             array('key' => '3', 'values' => array(
                 "First name" => "Jo",
                 "Surname" => "Bloggs",
-                "3" => "Test",
-                "4" => "",
+                "Column 3" => "Test",
+                "Column 4" => "",
                 "DoB" => "11/5/1081",
             )),
             array('key' => '4', 'values' => array(
                 "First name" => "Anthony",
                 "Surname" => "Fuller",
-                "3" => "",
-                "4" => "Test",
+                "Column 3" => "",
+                "Column 4" => "Test",
                 "DoB" => "18/1/1993",
             )),
         );
@@ -300,6 +295,8 @@ class CsvIteratorTest extends \PHPUnit_Framework_TestCase
         $reflection_class = new \ReflectionClass(__NAMESPACE__ . "\CsvIterator");
         $hasHeaders_prop = $reflection_class->getProperty('hasHeaders');
         $hasHeaders_prop->setAccessible(true);
+        $useHeaders_prop = $reflection_class->getProperty('useHeaders');
+        $useHeaders_prop->setAccessible(true);
         $headers_prop = $reflection_class->getProperty('headers');
         $headers_prop->setAccessible(true);
 
@@ -311,10 +308,13 @@ class CsvIteratorTest extends \PHPUnit_Framework_TestCase
         /**
          * Test ignoring headers
          */
-        $iterator->setHasHeaders('ignore');
+        $iterator->setHeaders('ignore');
 
         // Verify the hasHeader property has been updated
         $this->assertEquals(true, $hasHeaders_prop->getValue($iterator));
+
+        // Verify the useHeader property has been updated
+        $this->assertEquals(false, $useHeaders_prop->getValue($iterator));
 
         // Verify the headers are stored correctly
 
@@ -331,10 +331,13 @@ class CsvIteratorTest extends \PHPUnit_Framework_TestCase
         /**
          * Test using headers
          */
-        $iterator->setHasHeaders('use');
+        $iterator->setHeaders('use');
 
         // Verify the hasHeader property has been updated
         $this->assertEquals(true, $hasHeaders_prop->getValue($iterator));
+
+        // Verify the useHeader property has been updated
+        $this->assertEquals(true, $useHeaders_prop->getValue($iterator));
 
         // Verify the headers are stored correctly
 
@@ -346,12 +349,124 @@ class CsvIteratorTest extends \PHPUnit_Framework_TestCase
                 array(
                     "First name" => "Toby",
                     "Surname" => "Griffiths",
-                    "3" => "Test",
-                    "4" => "Test",
+                    "Column 3" => "Test",
+                    "Column 4" => "Test",
                     "DoB" => "12/10/1973"
                 )
             );
             break;
+        }
+    }
+
+    /**
+     * Test use of CsvIterator::setHeaders() to add custom headers when none
+     * previously
+     */
+    public function testSetCustomHeadersWithNoneThenCustomValues()
+    {
+
+        // We need to used the reflection class to access the protected properties of
+        // the iterator object
+        $reflection_class = new \ReflectionClass(__NAMESPACE__ . "\CsvIterator");
+        $hasHeaders_prop = $reflection_class->getProperty('hasHeaders');
+        $hasHeaders_prop->setAccessible(true);
+        $useHeaders_prop = $reflection_class->getProperty('useHeaders');
+        $useHeaders_prop->setAccessible(true);
+        $headers_prop = $reflection_class->getProperty('headers');
+        $headers_prop->setAccessible(true);
+        $customHeaders_prop = $reflection_class->getProperty('customHeaders');
+        $customHeaders_prop->setAccessible(true);
+
+        $iterator = new CsvIterator(
+            __DIR__ . '/files/test_file.csv',
+            'none'
+        );
+
+        // Verify the hasHeader property is correct
+        $this->assertEquals(false, $hasHeaders_prop->getValue($iterator));
+
+        // Verify the useHeader property is correct
+        $this->assertEquals(false, $useHeaders_prop->getValue($iterator));
+
+        // Verify the useHeader property is null
+        $this->assertNull($headers_prop->getValue($iterator));
+
+        // Verify the useHeader property is null
+        $this->assertNull($customHeaders_prop->getValue($iterator));
+
+        // Add custom headers
+        $customHeaders = array(
+            "Col 5",
+            "Col 4",
+            "Col 3",
+            "",
+            "Col 1"
+        );
+        $iterator->setCustomHeaders($customHeaders);
+
+        // Verify the hasHeader property has been updated
+        $this->assertEquals(false, $hasHeaders_prop->getValue($iterator));
+
+        // Verify the useHeader property has been updated
+        $this->assertEquals(true, $useHeaders_prop->getValue($iterator));
+
+        // Verify the useHeader property has been updated
+        $this->assertNull($headers_prop->getValue($iterator));
+
+        // Verify the useHeader property has been updated
+        $this->assertEquals(
+            $customHeaders,
+            $customHeaders_prop->getValue($iterator)
+        );
+
+        $expected_values = array(
+            array(
+                "key" => "1",
+                "values" => array(
+                    "Col 5" => "First name",
+                    "Col 4" => "Surname",
+                    "Col 3" => "",
+                    "Column 4" => "",
+                    "Col 1" => "DoB",
+                )
+            ),
+            array(
+                "key" => "2",
+                "values" => array(
+                    "Col 5" => "Toby",
+                    "Col 4" => "Griffiths",
+                    "Col 3" => "Test",
+                    "Column 4" => "Test",
+                    "Col 1" => "12/10/1973"
+                )
+            ),
+            array(
+                "key" => "3",
+                "values" => array(
+                    "Col 5" => "Jo",
+                    "Col 4" => "Bloggs",
+                    "Col 3" => "Test",
+                    "Column 4" => "",
+                    "Col 1" => "11/5/1081"
+                )
+            ),
+            array(
+                "key" => "4",
+                "values" => array(
+                    "Col 5" => "Anthony",
+                    "Col 4" => "Fuller",
+                    "Col 3" => "",
+                    "Column 4" => "Test",
+                    "Col 1" => "18/1/1993"
+                )
+            ),
+        );
+        $row = 0;
+        foreach ($iterator as $key => $values) {
+            $expected = $expected_values[$row];
+            $this->assertEquals($expected["key"], $key);
+            $this->assertEquals($expected["values"], $values);
+            $row++;
         }
     }
 }

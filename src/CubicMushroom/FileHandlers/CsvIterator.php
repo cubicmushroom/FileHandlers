@@ -1,5 +1,5 @@
 <?php
-/*
+/**
  * This file is part of the CubicMushroom/CsvIterator package.
  *
  * (c) Toby Griffiths <toby@cubicmushroom.com>
@@ -8,7 +8,14 @@
  * file that was distributed with this source code.
  *
  * Code based on source found here...
- *   http://snipplr.com/view/1986/
+ *   http://php.net/manual/en/function.fgetcsv.php#57802
+ *
+ * @package    Cubic_Mushroom_File_Handlers
+ * @subpackage CSV_Handlers
+ *
+ * @author     Toby Griffiths <toby@cubicmushroom.com>
+ * @copyright  2012 Cubic Mushroom Ltd
+ * @license    See LICENSE file
  */
 
 namespace CubicMushroom\FileHandlers;
@@ -16,68 +23,96 @@ namespace CubicMushroom\FileHandlers;
 // We need to enable support for Mac format line endings
 ini_set("auto_detect_line_endings", true);
 
+/**
+ * Class used to iterate through a CSV file a row at a time
+ *
+ * @package    Cubic_Mushroom_File_Handlers
+ * @subpackage CSV_Handlers
+ *
+ * @author     Toby Griffiths <toby@cubicmushroom.com>
+ * @copyright  2012 Cubic Mushroom Ltd
+ * @license    See LICENSE file
+ */
 class CsvIterator implements \Iterator
 {
     /**
      * File path provided
+     * @var string
      */
     protected $file;
 
     /**
      * File handle used for accessing file
+     * @var resource
      */
     protected $fileHandle;
 
     /**
      * Delimited used when parsing CSV file
+     * @var string
      */
     protected $delimiter;
 
     /**
      * Row size in characters (0 = no limit/all of row read)
+     * @var integer
      */
     protected $rowSize;
 
     /**
      * Flag indicating whether the file had a header
+     * @var boolean
      */
     protected $hasHeaders = false;
 
     /**
      * Whether to use headers to index returned row array
+     * @var boolean
      */
     protected $useHeaders = false;
 
     /**
      * Array of headers to use (if requested)
+     * @var array
      */
     protected $headers;
 
     /**
+     * Stores custom headers, if specified
+     * @var array
+     */
+    protected $customHeaders;
+
+    /**
      * Current row stored in iteratorElement
+     * @var integer
      */
     protected $iteratorRow;
 
     /**
      * Contents of the current row
+     * @var array
      */
     protected $iteratorElement;
 
     /**
      * Currently does nothing
      *
-     * @param string $file      Full path to file
-     * @param string $delimiter String to use as delimiter when reading CSV file row
-     * @param string $header    none|use|ignore...
-     *                          'none' = File does not include a header
-     *                          'use'  = Header row values will be used as keys for
-     *                                   returned data
-     *                          'none' = File has a header row, but returned row will
-     *                                   have numbered index
+     * @param string       $file      Full path to file
+     * @param string|array $headers   See CsvIterator::setHeaders()
+     * @param string       $delimiter String to use as delimiter when reading CSV
+     *                                file row
+     * @param integer      $rowSize   Number of bytes to read from each row.
+     *                                Defaults to 0 (no limit)
+     *
+     * @uses CsvIterator::setHeaders()
+     *
+     * @return void
      */
-    public function __construct($file, $headers = 'none', $delimiter = ",", $rowSize = 0)
-    {
-        if (!is_file($file)){
+    public function __construct(
+        $file, $headers = 'none', $delimiter = ",", $rowSize = 0
+    ) {
+        if (!is_file($file)) {
             throw new \InvalidArgumentException(
                 'File not found (' . $this->file . ')'
             );
@@ -104,29 +139,67 @@ class CsvIterator implements \Iterator
     }
 
     /**
-     * 
+     * Sets how to use the headers.
+     *
+     * @param string|array $headers none|use|ignore...
+     *                              'none' = File does not include a header
+     *                              'use'  = Header row values will be used as keys
+     *                                       for returned data
+     *                              'none' = File has a header row, but returned
+     *                                       row will have numbered index
+     *
+     * @return void
      */
-    protected function setHeaders($value)
+    public function setHeaders($headers)
     {
         $allowed_values = array('none', 'ignore', 'use');
 
-        if (! in_array($value, $allowed_values)) {
+        if (! in_array($headers, $allowed_values)) {
             throw new InvalidArgumentException(
                 '$headers value must be one of "' . implode('", "', $allowed_values) 
                 . '"'
             );
         }
 
-        if ('none' == $value) {
+        if ('none' == $headers) {
             $this->hasHeaders = false;
             $this->useHeaders = false;
         } else {
             $this->hasHeaders = true;
-            if ('ignore' == $value) {
+            if ('ignore' == $headers) {
                 $this->useHeaders = false;
             } else {
                 $this->useHeaders = true;
             }
+        }
+
+        // If headers are now needed, we need to re-open the file so that the headers
+        // property is updated
+        if ($this->hasHeaders) {
+            @fclose($this->fileHandle);
+            $this->openFile();
+        }
+    }
+
+    /**
+     * Allows used to specify custom headers to use
+     *
+     * @param array $headers Array of headers to use
+     *
+     * @return void
+     */
+    public function setCustomHeaders($headers = null)
+    {
+        if (empty($headers)) {
+            $this->headers = null;
+            $this->useHeaders = false;
+        } elseif (is_array($headers)) {
+            $this->customHeaders = $headers;
+            $this->useHeaders = true;
+        } else {
+            throw new InvalidArgumentException(
+                "Custom headers my be provided as an array"
+            );
         }
     }
 
@@ -151,11 +224,8 @@ class CsvIterator implements \Iterator
             $header_values = $this->current();
             if (! empty($this->useHeaders)) {
                 $this->headers = array_values($header_values);
-                foreach ($this->headers as $key => $value) {
-                    if (empty($value)) {
-                        $this->headers[$key] = $key+1;
-                    }
-                }
+
+                // Empty headers are now handled when reading the current row
             }
         }
     }
@@ -172,13 +242,22 @@ class CsvIterator implements \Iterator
             $this->fileHandle, $this->rowSize, $this->delimiter
         );
 
-        if (! empty($this->headers)) {
+        $headers = $this->headers;
+        if (! empty($this->customHeaders)) {
+            $headers = $this->customHeaders;
+        }
+
+        if (! empty($headers)) {
             // We need to use a temporary array, as previously updated existing array
             // & unset numeric value, but title-less columns (using numbers) would
             // get unset
             $newElement = array();
             foreach ($this->iteratorElement as $key => $value) {
-                $newElement[$this->headers[$key]] = $value;
+                $newKey = $headers[$key];
+                if (empty($newKey)) {
+                    $newKey = "Column " . ($key + 1);
+                }
+                $newElement[$newKey] = $value;
             }
             $this->iteratorElement = $newElement;
         }
@@ -190,6 +269,9 @@ class CsvIterator implements \Iterator
 
     /**
      * Return the key of the current element
+     *
+     * @return integer Returns the current row of the CSV file to use as the iterator
+     *         key
      */
     public function key()
     {
@@ -199,6 +281,8 @@ class CsvIterator implements \Iterator
 
     /**
      * Move forward to next element
+     *
+     * @return boolean Returns true if we're not at the end of the file yet
      */
     public function next()
     {
@@ -235,24 +319,11 @@ class CsvIterator implements \Iterator
      */
     public function valid()
     {
-        if(! $this->next())
-        {
+        if (! $this->next()) {
             fclose($this->fileHandle);
             return false;
         }
         return true;
-    }
-
-    public function setHasHeaders($headers)
-    {
-        $this->setHeaders($headers);
-
-        // If headers are now needed, we need to re-open the file so that the headers
-        // property is updated
-        if ($this->hasHeaders) {
-            fclose($this->fileHandle);
-            $this->openFile();
-        }
     }
 
 }
